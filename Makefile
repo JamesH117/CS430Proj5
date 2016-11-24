@@ -1,3 +1,2 @@
 all:
-	cl /MD /I. *.lib Project5.c
-
+	cl /MD /I. *.lib ezview.c
