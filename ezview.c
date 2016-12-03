@@ -4,34 +4,18 @@
 #include <GLES2/gl2.h>
 #include <GLFW/glfw3.h>
 
+#include "linmath.h"
 #include <stdlib.h>
 #include <stdio.h>
-
-
-GLFWwindow* window;
-
-
-typedef struct {
-  float position[3];
-  float color[4];
-  float texcoord[2];
-} Vertex;
-
-
-const Vertex Vertices[] = {
-  {{1, -1, 0}, {1, 0, 0, 1}, {1,0}}, //Bottom Right
-  {{1, 1, 0}, {0, 1, 0, 1}, {1,1}},  //Top Right
-  {{-1, 1, 0}, {0, 0, 1, 1}, {0,1}}, //Top Left
-  {{-1, -1, 0}, {0, 0, 0, 1}, {0,0}} //Bottom Left
-};
-
-
-const GLubyte Indices[] = {
-  0, 1, 2,
-  2, 3, 0
-};
+#include <assert.h>
+#define PI 3.14159265
+float rotate_value = 0;
+float scale_value = 1;
+float translate_x =0;
+float translate_y =0;
+float translate_z =0;
+/*
 typedef struct PPMpixel{
-    //Test is '\n' at beginning of each line of rgb
     unsigned char r,g,b;
     } PPMpixel;
 
@@ -199,189 +183,269 @@ int ppm_read(char *input_file){
     fclose(fh);
     return 0;
 }
+*/
+typedef struct {
+  float Position[2];
+  float TexCoord[2];
+} Vertex;
 
+// (-1, 1)  (1, 1)
+// (-1, -1) (1, -1)
 
-char* vertex_shader_src =
-  "attribute vec4 Position;\n"
-  "attribute vec4 SourceColor;\n"
-  "\n"
-  "varying vec4 DestinationColor;\n"
-  "\n"
-  "void main(void) {\n"
-  "    DestinationColor = SourceColor;\n"
-  "    gl_Position = Position;\n"
-  "}\n";
+Vertex vertexes[] = {
+  {{1, -1}, {1, 0}},
+  {{1, 1},  {1, 1}},
+  {{-1, 1}, {0, 1}}
+};
 
+static const char* vertex_shader_text =
+"uniform mat4 MVP;\n"
+"attribute vec2 TexCoordIn;\n"
+"attribute vec2 vPos;\n"
+"varying vec2 TexCoordOut;\n"
+"void main()\n"
+"{\n"
+"    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
+"    TexCoordOut = TexCoordIn;\n"
+"}\n";
 
-char* fragment_shader_src =
-  "varying lowp vec4 DestinationColor;\n"
-  "\n"
-  "void main(void) {\n"
-  "    gl_FragColor = DestinationColor;\n"
-  "}\n";
+static const char* fragment_shader_text =
+"varying lowp vec2 TexCoordOut;\n"
+"uniform sampler2D Texture;\n"
+"void main()\n"
+"{\n"
+"    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
+"}\n";
 
+static void error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Error: %s\n", description);
+}
 
-GLint simple_shader(GLint shader_type, char* shader_src) {
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
 
-  GLint compile_success = 0;
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
+        glfwSetWindowShouldClose(window, GLFW_TRUE);}
+    if (key == GLFW_KEY_A && action == GLFW_PRESS){
+      printf("Rotate Left\n");
+      rotate_value += PI/2;
+      }
+    if (key == GLFW_KEY_D && action == GLFW_PRESS){
+      printf("Rotate Right\n");
+      rotate_value -= PI/2;
+      }
+    if (key == GLFW_KEY_W && action == GLFW_PRESS){
+      printf("Scale Up\n");
+      scale_value += 0.1;
+      }
+    if (key == GLFW_KEY_S && action == GLFW_PRESS){
+      printf("Scale Down\n");
+      scale_value -= 0.1;
+      }
+    if (key == GLFW_KEY_Z && action == GLFW_PRESS){
+      printf("Shear\n");
+      }
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS){
+      printf("Translate Left\n");
+      translate_x -= 0.1;
+      //translate_y += 1;
+      //translate_z += 0.3;
+      }
+    if (key == GLFW_KEY_E && action == GLFW_PRESS){
+      printf("Translate Right\n");
+      translate_x += 0.1;
+      }
+}
 
-  int shader_id = glCreateShader(shader_type);
-
-  glShaderSource(shader_id, 1, &shader_src, 0);
-
-  glCompileShader(shader_id);
-
-  glGetShaderiv(shader_id, GL_COMPILE_STATUS, &compile_success);
-
-  if (compile_success == GL_FALSE) {
-    GLchar message[256];
-    glGetShaderInfoLog(shader_id, sizeof(message), 0, &message[0]);
-    printf("glCompileShader Error: %s\n", message);
+void glCompileShaderOrDie(GLuint shader) {
+  GLint compiled;
+  glCompileShader(shader);
+  glGetShaderiv(shader,
+		GL_COMPILE_STATUS,
+		&compiled);
+  if (!compiled) {
+    GLint infoLen = 0;
+    glGetShaderiv(shader,
+		  GL_INFO_LOG_LENGTH,
+		  &infoLen);
+    char* info = malloc(infoLen+1);
+    GLint done;
+    glGetShaderInfoLog(shader, infoLen, &done, info);
+    printf("Unable to compile shader: %s\n", info);
     exit(1);
   }
-
-  return shader_id;
 }
 
+// 4 x 4 image..
+unsigned char image[] = {
+  255, 0, 0, 255,
+  255, 0, 0, 255,
+  255, 0, 0, 255,
+  255, 0, 0, 255,
 
-int simple_program() {
+  0, 255, 0, 255,
+  0, 255, 0, 255,
+  0, 255, 0, 255,
+  0, 255, 0, 255,
 
-  GLint link_success = 0;
+  0, 0, 255, 255,
+  0, 0, 255, 255,
+  0, 0, 255, 255,
+  0, 0, 255, 255,
 
-  GLint program_id = glCreateProgram();
-  GLint vertex_shader = simple_shader(GL_VERTEX_SHADER, vertex_shader_src);
-  GLint fragment_shader = simple_shader(GL_FRAGMENT_SHADER, fragment_shader_src);
+  255, 0, 255, 255,
+  255, 0, 255, 255,
+  255, 0, 255, 255,
+  255, 0, 255, 255
+};
 
-  glAttachShader(program_id, vertex_shader);
-  glAttachShader(program_id, fragment_shader);
-
-  glLinkProgram(program_id);
-
-  glGetProgramiv(program_id, GL_LINK_STATUS, &link_success);
-
-  if (link_success == GL_FALSE) {
-    GLchar message[256];
-    glGetProgramInfoLog(program_id, sizeof(message), 0, &message[0]);
-    printf("glLinkProgram Error: %s\n", message);
-    exit(1);
-  }
-
-  return program_id;
-}
-
-
-static void error_callback(int error, const char* description) {
-  fputs(description, stderr);
-}
-
-
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
+  /*
   if(argc != 2){
-      fprintf(stderr, "Error: Not enough arguments need image file name. \n");
+    fprintf(stderr, "Error: Not enough arguments need image file name. \n");
+    exit(1);
   }
   char *input_file = argv[1];
   ppm_read(input_file);
-
-  GLint program_id, position_slot, color_slot;
-  GLuint vertex_buffer;
-  GLuint index_buffer;
+  */
+  GLFWwindow* window;
+  GLuint vertex_buffer, vertex_shader, fragment_shader, program;
+  GLint mvp_location, vpos_location, vcol_location;
 
   glfwSetErrorCallback(error_callback);
 
-  // Initialize GLFW library
   if (!glfwInit())
-    return -1;
+      exit(EXIT_FAILURE);
 
-  glfwDefaultWindowHints();
-  glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
-  glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+      glfwDefaultWindowHints();
+      glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+      glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-  // Create and open a window
-  window = glfwCreateWindow(image->width,
-                            image->height,
-                            "Hello World",
-                            NULL,
-                            NULL);
-
-  if (!window) {
-    glfwTerminate();
-    printf("glfwCreateWindow Error\n");
-    exit(1);
+  window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
+  if (!window)
+  {
+      glfwTerminate();
+      exit(EXIT_FAILURE);
   }
 
+  glfwSetKeyCallback(window, key_callback);
+
   glfwMakeContextCurrent(window);
+  // gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+  glfwSwapInterval(1);
 
-  program_id = simple_program();
-  glUseProgram(program_id);
+  // NOTE: OpenGL error checks have been omitted for brevity
 
-//Loading my Image
-  GLuint myTexture;
-  glGenTextures(1, &myTexture);
-  glBindTexture(GL_TEXTURE_2D, myTexture);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, //No LOD
-  				GL_RGBA, //FORMAT... GL_RGBA
-  				image->width,
-  				image->height,
-  				0, //No Border
-  				GL_RGBA,
-  				MAX_COLORS, //whatever your numeric representation is...
-  				image->buffer);
-          printf("Image loaded successfully?");
-//End Loading my Image
-
-
-  position_slot = glGetAttribLocation(program_id, "Position");
-  color_slot = glGetAttribLocation(program_id, "SourceColor");
-  glEnableVertexAttribArray(position_slot);
-  glEnableVertexAttribArray(color_slot);
-
-  // Create Buffer
   glGenBuffers(1, &vertex_buffer);
-
-  // Map GL_ARRAY_BUFFER to this buffer
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertexes), vertexes, GL_STATIC_DRAW);
 
-  // Send the data
-  glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
+  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
+  glCompileShaderOrDie(vertex_shader);
 
-  glGenBuffers(1, &index_buffer);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
+  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
+  glCompileShaderOrDie(fragment_shader);
 
-  // Repeat
-  while (!glfwWindowShouldClose(window)) {
+  program = glCreateProgram();
+  glAttachShader(program, vertex_shader);
+  glAttachShader(program, fragment_shader);
+  glLinkProgram(program);
+  // more error checking! glLinkProgramOrDie!
 
-    glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT);
+  mvp_location = glGetUniformLocation(program, "MVP");
+  assert(mvp_location != -1);
 
-    glViewport(0, 0, image->width, image->height);
+  vpos_location = glGetAttribLocation(program, "vPos");
+  assert(vpos_location != -1);
 
-    glVertexAttribPointer(position_slot,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          0);
+  GLint texcoord_location = glGetAttribLocation(program, "TexCoordIn");
+  assert(texcoord_location != -1);
 
-    glVertexAttribPointer(color_slot,
-                          4,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          (GLvoid*) (sizeof(float) * 3));
+  GLint tex_location = glGetUniformLocation(program, "Texture");
+  assert(tex_location != -1);
 
-    glDrawElements(GL_TRIANGLES,
-                   sizeof(Indices) / sizeof(GLubyte),
-                   GL_UNSIGNED_BYTE, 0);
+  glEnableVertexAttribArray(vpos_location);
+  glVertexAttribPointer(vpos_location,
+  	  2,
+  	  GL_FLOAT,
+  	  GL_FALSE,
+                        sizeof(Vertex),
+  	  (void*) 0);
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+  glEnableVertexAttribArray(texcoord_location);
+  glVertexAttribPointer(texcoord_location,
+  	  2,
+  	  GL_FLOAT,
+  	  GL_FALSE,
+                        sizeof(Vertex),
+  	  (void*) (sizeof(float) * 2));
+
+  int image_width = 4;
+  int image_height = 4;
+
+  GLuint texID;
+  glGenTextures(1, &texID);
+  glBindTexture(GL_TEXTURE_2D, texID);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA,
+   GL_UNSIGNED_BYTE, image);
+
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, texID);
+  glUniform1i(tex_location, 0);
+
+  while (!glfwWindowShouldClose(window))
+  {
+      float ratio;
+      int width, height;
+      mat4x4 m, p, mvp;
+      mat4x4 rm, tm, sm;
+
+      glfwGetFramebufferSize(window, &width, &height);
+      ratio = width / (float) height;
+
+      glViewport(0, 0, width, height);
+      glClear(GL_COLOR_BUFFER_BIT);
+
+      mat4x4_identity(m);
+      mat4x4_identity(rm);
+      mat4x4_identity(tm);
+      mat4x4_identity(sm);
+      //mat4x4_rotate_Z(m, m, (float) glfwGetTime());
+      mat4x4_rotate_Z(rm, rm, rotate_value);
+
+      mat4x4_translate(tm,translate_x,translate_y,translate_z);
+
+      mat4x4_scale_aniso(sm, sm, scale_value, scale_value, scale_value);
+
+
+      mat4x4_add(m,tm,m);
+      mat4x4_add(m,sm,m);
+      mat4x4_mul(m,rm,m);
+
+
+      mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+      mat4x4_mul(mvp, p, m);
+
+      glUseProgram(program);
+      glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
+      glDrawArrays(GL_TRIANGLES, 0, 3);
+
+      glfwSwapBuffers(window);
+      glfwPollEvents();
   }
 
   glfwDestroyWindow(window);
+
   glfwTerminate();
   exit(EXIT_SUCCESS);
 }
+
+//! [code]
