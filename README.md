@@ -7,3 +7,9 @@ The GLFW window will allow the user to translate, rotate, scale, and shear the i
 Compile the C file using nmake.
 Run the program by calling: ezview input.ppm
 where input.ppm is the name of the ppm image being provided to the program.
+
+##Controls
+A & D : Roates the image by 90 degree increments.
+W & S: Scale the image by 30% increments.
+Z & X: Shear the image by 30% increments
+Q & E: Translate the image in positive or negative X directions.
