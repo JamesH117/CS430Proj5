@@ -14,8 +14,12 @@ float scale_value = 1;
 float translate_x =0;
 float translate_y =0;
 float translate_z =0;
-/*
+float shear_value = 0;
+
+
+
 typedef struct PPMpixel{
+    //Test is '\n' at beginning of each line of rgb
     unsigned char r,g,b;
     } PPMpixel;
 
@@ -23,11 +27,13 @@ typedef struct PPMimage {
     int width, height;
     int input_filetype;
     PPMpixel *buffer;
-} PPMimage;
+    } PPMimage;
 
 PPMimage *image;
 //Definition for max colors, and also for buffer size usage
 #define MAX_COLORS 255
+//Function to convert ASCII to Binary Bits and Binary Bits to ASCII
+int ppm_convert(int output_type, int input_filetype);
 //Function to reset my temp buffer that I use to put ascii characters into image buffer
 void *memset(void *str, int c, size_t n);
 //Function I use to help grab all ascii characters but not spaces
@@ -145,45 +151,14 @@ int ppm_read(char *input_file){
     }
     //If a P6 file, read the entire thing into buffer, need to fix minor bug if possible
     if(image->input_filetype == '6'){
-        //fread(image->buffer, (sizeof(&image->buffer)), height*width, fh);
-        //printf("%d\n", fgetc(fh));
-        j=0;
-        tracker=0;
-        while((c = fgetc(fh)) != EOF){
-            //If character I grab is a space, iterate until I no longer have a space
-            if(isspace(c)){
-                //Get rid of extra spaces in case there is more than one space between each pixel data
-                while(isspace(c = fgetc(fh))){
-                }
-                ungetc(c, fh);
-            }
-            else{
-                if((int)c > MAX_COLORS){
-                    fprintf(stderr, "Some pixel data is larger than Max color size allowed.");
-                    exit(1);
-                    }
-                if(tracker == 0){
-                    image->buffer[j].r = c;
-                    tracker++;
-                }
-                else if(tracker == 1){
-                    image->buffer[j].g = c;
-                    tracker++;
-                }
-                else{
-                    image->buffer[j].b = c;
-                    tracker = 0;
-                    j++;
-                    }
-            }
-            //printf("C is %d\n", (int)c);
-        }
-    ungetc(c, fh);
+        fread(image->buffer, (sizeof(&image->buffer)), height*width, fh);
     }
     fclose(fh);
     return 0;
+
 }
-*/
+
+
 typedef struct {
   float Position[2];
   float TexCoord[2];
@@ -196,6 +171,11 @@ Vertex vertexes[] = {
   {{1, -1}, {1, 0}},
   {{1, 1},  {1, 1}},
   {{-1, 1}, {0, 1}}
+};
+
+const GLubyte Indices[] = {
+  0, 1, 2,
+  2, 3, 0
 };
 
 static const char* vertex_shader_text =
@@ -228,33 +208,38 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
         glfwSetWindowShouldClose(window, GLFW_TRUE);}
     if (key == GLFW_KEY_A && action == GLFW_PRESS){
-      printf("Rotate Left\n");
+      //printf("Rotate Left\n");
       rotate_value += PI/2;
       }
     if (key == GLFW_KEY_D && action == GLFW_PRESS){
-      printf("Rotate Right\n");
+      //printf("Rotate Right\n");
       rotate_value -= PI/2;
       }
     if (key == GLFW_KEY_W && action == GLFW_PRESS){
-      printf("Scale Up\n");
-      scale_value += 0.1;
+      //printf("Scale Up\n");
+      scale_value += 0.3;
       }
     if (key == GLFW_KEY_S && action == GLFW_PRESS){
-      printf("Scale Down\n");
-      scale_value -= 0.1;
+      //printf("Scale Down\n");
+      scale_value -= 0.3;
       }
     if (key == GLFW_KEY_Z && action == GLFW_PRESS){
-      printf("Shear\n");
+      //printf("Shear Left\n");
+      shear_value -= 0.3;
+      }
+    if (key == GLFW_KEY_X && action == GLFW_PRESS){
+      //printf("Shear Right\n");
+      shear_value +=0.3;
       }
     if (key == GLFW_KEY_Q && action == GLFW_PRESS){
-      printf("Translate Left\n");
-      translate_x -= 0.1;
+      //printf("Translate Left\n");
+      translate_x -= 0.3;
       //translate_y += 1;
       //translate_z += 0.3;
       }
     if (key == GLFW_KEY_E && action == GLFW_PRESS){
-      printf("Translate Right\n");
-      translate_x += 0.1;
+      //printf("Translate Right\n");
+      translate_x += 0.3;
       }
 }
 
@@ -278,7 +263,7 @@ void glCompileShaderOrDie(GLuint shader) {
 }
 
 // 4 x 4 image..
-unsigned char image[] = {
+unsigned char pimage[] = {
   255, 0, 0, 255,
   255, 0, 0, 255,
   255, 0, 0, 255,
@@ -301,16 +286,15 @@ unsigned char image[] = {
 };
 
 int main(int argc, char *argv[]){
-  /*
   if(argc != 2){
     fprintf(stderr, "Error: Not enough arguments need image file name. \n");
     exit(1);
   }
   char *input_file = argv[1];
   ppm_read(input_file);
-  */
+
   GLFWwindow* window;
-  GLuint vertex_buffer, vertex_shader, fragment_shader, program;
+  GLuint vertex_buffer, vertex_shader, fragment_shader, program, index_buffer;
   GLint mvp_location, vpos_location, vcol_location;
 
   glfwSetErrorCallback(error_callback);
@@ -324,7 +308,7 @@ int main(int argc, char *argv[]){
       glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
       glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-  window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
+  window = glfwCreateWindow(850, 480, "Simple example", NULL, NULL);
   if (!window)
   {
       glfwTerminate();
@@ -342,6 +326,11 @@ int main(int argc, char *argv[]){
   glGenBuffers(1, &vertex_buffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertexes), vertexes, GL_STATIC_DRAW);
+
+  glGenBuffers(1, &index_buffer);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
+
 
   vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
@@ -385,8 +374,8 @@ int main(int argc, char *argv[]){
                         sizeof(Vertex),
   	  (void*) (sizeof(float) * 2));
 
-  int image_width = 4;
-  int image_height = 4;
+  int pimage_width = 4;
+  int pimage_height = 4;
 
   GLuint texID;
   glGenTextures(1, &texID);
@@ -394,19 +383,23 @@ int main(int argc, char *argv[]){
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA,
-   GL_UNSIGNED_BYTE, image);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image->width, image->height, 0, GL_RGB,
+   GL_UNSIGNED_BYTE, image->buffer);
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texID);
   glUniform1i(tex_location, 0);
+
+//HELP how to get other triangle for square image??
+//HELP How to adjust ratio of triangle for rectangular images?
+
 
   while (!glfwWindowShouldClose(window))
   {
       float ratio;
       int width, height;
       mat4x4 m, p, mvp;
-      mat4x4 rm, tm, sm;
+      mat4x4 rm, tm, sm,shm;
 
       glfwGetFramebufferSize(window, &width, &height);
       ratio = width / (float) height;
@@ -414,28 +407,31 @@ int main(int argc, char *argv[]){
       glViewport(0, 0, width, height);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      mat4x4_identity(m);
-      mat4x4_identity(rm);
-      mat4x4_identity(tm);
-      mat4x4_identity(sm);
-      //mat4x4_rotate_Z(m, m, (float) glfwGetTime());
+      mat4x4_identity(m); //affine matrix
+      mat4x4_identity(rm);  //Rotation Matrix
+      mat4x4_identity(tm);  //Translate Matrix
+      mat4x4_identity(sm);  //Scale Matrix
+      mat4x4_identity(shm); //Shear Matrix
+
+      //Calculating Values for matrix manipulation
       mat4x4_rotate_Z(rm, rm, rotate_value);
-
       mat4x4_translate(tm,translate_x,translate_y,translate_z);
-
       mat4x4_scale_aniso(sm, sm, scale_value, scale_value, scale_value);
+      mat4x4_shear(shm, shm, shear_value, shear_value);
 
-
+      //Creating a Single Affine Matrix
       mat4x4_add(m,tm,m);
       mat4x4_add(m,sm,m);
+      mat4x4_add(m,shm,m);
       mat4x4_mul(m,rm,m);
-
 
       mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
       mat4x4_mul(mvp, p, m);
 
       glUseProgram(program);
       glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
+
+      //glDrawElements(GL_TRIANGLES,sizeof(Indices) / sizeof(GLubyte),GL_UNSIGNED_BYTE, (void*) Indices);
       glDrawArrays(GL_TRIANGLES, 0, 3);
 
       glfwSwapBuffers(window);

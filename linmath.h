@@ -153,6 +153,7 @@ static inline void mat4x4_mul(mat4x4 M, mat4x4 a, mat4x4 b)
 	}
 	mat4x4_dup(M, temp);
 }
+
 static inline void mat4x4_mul_vec4(vec4 r, mat4x4 M, vec4 v)
 {
 	int i, j;
@@ -231,6 +232,21 @@ static inline void mat4x4_rotate_X(mat4x4 Q, mat4x4 M, float angle)
 		{0.f, 0.f, 0.f, 1.f}
 	};
 	mat4x4_mul(Q, M, R);
+}
+static inline void mat4x4_shear(mat4x4 Q, mat4x4 M, float x, float y){
+	vec4 yx = {{x},
+			  {y},
+			  {1},
+			  {1}};
+	
+	mat4x4 R = {
+		{1.f,   y, 1.f, 0.f},
+		{  x, 1.f, 1.f, 0.f},
+		{1.f, 1.f, 1.f, 0.f},
+		{0.f, 0.f, 0.f, 1.f}
+	};
+	mat4x4_mul(Q, M, R);
+	
 }
 static inline void mat4x4_rotate_Y(mat4x4 Q, mat4x4 M, float angle)
 {
