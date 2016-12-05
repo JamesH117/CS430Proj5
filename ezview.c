@@ -18,6 +18,7 @@ float shear_value = 0;
 
 
 
+
 typedef struct PPMpixel{
     //Test is '\n' at beginning of each line of rgb
     unsigned char r,g,b;
@@ -168,9 +169,14 @@ typedef struct {
 // (-1, -1) (1, -1)
 
 Vertex vertexes[] = {
-  {{1, -1}, {1, 0}},
-  {{1, 1},  {1, 1}},
-  {{-1, 1}, {0, 1}}
+  {{-1, 1}, {0, 0}},
+  {{1, 1},  {1, 0}},
+  {{-1, -1},  {0, 1}},
+  {{1, 1}, {1, 0}},
+
+  {{1, -1},  {1, 1}},
+  {{-1, -1},  {0, 1}}
+
 };
 
 const GLubyte Indices[] = {
@@ -296,6 +302,7 @@ int main(int argc, char *argv[]){
   GLFWwindow* window;
   GLuint vertex_buffer, vertex_shader, fragment_shader, program, index_buffer;
   GLint mvp_location, vpos_location, vcol_location;
+  float x_ratio =0;
 
   glfwSetErrorCallback(error_callback);
 
@@ -390,16 +397,15 @@ int main(int argc, char *argv[]){
   glBindTexture(GL_TEXTURE_2D, texID);
   glUniform1i(tex_location, 0);
 
-//HELP how to get other triangle for square image??
 //HELP How to adjust ratio of triangle for rectangular images?
-
 
   while (!glfwWindowShouldClose(window))
   {
       float ratio;
+      x_ratio = (float)image->width/(float)image->height;
       int width, height;
       mat4x4 m, p, mvp;
-      mat4x4 rm, tm, sm,shm;
+      mat4x4 rm, tm, sm,shm, arm;
 
       glfwGetFramebufferSize(window, &width, &height);
       ratio = width / (float) height;
@@ -412,6 +418,7 @@ int main(int argc, char *argv[]){
       mat4x4_identity(tm);  //Translate Matrix
       mat4x4_identity(sm);  //Scale Matrix
       mat4x4_identity(shm); //Shear Matrix
+      mat4x4_identity(arm);
 
       //Calculating Values for matrix manipulation
       mat4x4_rotate_Z(rm, rm, rotate_value);
@@ -421,6 +428,7 @@ int main(int argc, char *argv[]){
 
       //Creating a Single Affine Matrix
       mat4x4_add(m,tm,m);
+      mat4x4_add(m,arm,m);
       mat4x4_add(m,sm,m);
       mat4x4_add(m,shm,m);
       mat4x4_mul(m,rm,m);
@@ -432,7 +440,7 @@ int main(int argc, char *argv[]){
       glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
 
       //glDrawElements(GL_TRIANGLES,sizeof(Indices) / sizeof(GLubyte),GL_UNSIGNED_BYTE, (void*) Indices);
-      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glDrawArrays(GL_TRIANGLES, 0, 6);
 
       glfwSwapBuffers(window);
       glfwPollEvents();
