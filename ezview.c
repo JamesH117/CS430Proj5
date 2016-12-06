@@ -182,7 +182,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS){
-        glfwSetWindowShouldClose(window, GLFW_TRUE);}
+        glfwSetWindowShouldClose(window, 1);}
     if (key == GLFW_KEY_A && action == GLFW_PRESS){
       //printf("Rotate Left\n");
       rotate_value += PI/2;
