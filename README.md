@@ -9,7 +9,7 @@ Run the program by calling: ezview input.ppm
 where input.ppm is the name of the ppm image being provided to the program.  
 
 ##Known Problems
-P3 Image Type Inputs seem to be bugged out, works perfectly fine on all P6 input images.  
+Everything works but reading in a P3 File is #SLOW, but it still works.  Will try to optimize it to be faster.  
 
 ##Controls
 A & D : Roates the image by 90 degree increments.  

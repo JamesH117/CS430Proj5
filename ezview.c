@@ -108,47 +108,19 @@ int ppm_read(char *input_file){
     //Remove unnecessary character still in file
     fgetc(fh);
     if(image->input_filetype == '3'){
-        j=0;
+        printf("Reading in a P3 File, this is a bit slow.  Slight optimization problem.");
         i=0;
         //HELP, this is bugging out for outputing P3 image
-        while ((c = fgetc(fh)) != EOF){
-            //If character I grab is a space, then I have a full rgb component, add to buffer
-            if(isspace(c)){
-
-                //Get rid of extra spaces in case there is more than one space between each pixel data
-                while(isspace(c = fgetc(fh))){
-                }
-                ungetc(c, fh);
-                //Convert Pixel data to an int
-                k = atoi(temp_buffer);
-                //Check if pixel data is too large
-                if(k > MAX_COLORS){
-                    fprintf(stderr, "Some pixel data is larger than Max color size allowed.");
-                    exit(1);
-                }
-                //Put pixel data into corresponding RGB
-                tracker++;
-                if(tracker == 1){
-                    image->buffer[j].r = k;
-                }
-                if(tracker == 2){
-                    image->buffer[j].g = k;
-                }
-                if(tracker == 3){
-                    image->buffer[j].b = k;
-                    tracker = 0;
-                }
-                j++;
-                i = 0;
-                //Empty out temp buffer since some numbers may only be 1 digit or 2 digit instead of max 3
-                memset(temp_buffer, '\0', sizeof(temp_buffer));
-            }
-            else{
-                //Put part of full number into temp_buffer until I grab entire number
-                temp_buffer[i++] = c;
-            }
+        for (i = 0; i < height*width*3; i++){
+            int v;
+            fscanf(fh, "%d", &v);
+            image->buffer[i].r = v;
+            fscanf(fh, "%d", &v);
+            image->buffer[i].g = v;
+            fscanf(fh, "%d", &v);
+            image->buffer[i].b = v;
         }
-    ungetc(c, fh);
+
     }
     //If a P6 file, read the entire thing into buffer, need to fix minor bug if possible
     if(image->input_filetype == '6'){
