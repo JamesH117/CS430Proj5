@@ -15,7 +15,7 @@ float translate_x =0;
 float translate_y =0;
 float translate_z =0;
 float shear_value = 0;
-
+float x_ratio = 0;
 
 
 
@@ -110,6 +110,7 @@ int ppm_read(char *input_file){
     if(image->input_filetype == '3'){
         j=0;
         i=0;
+        //HELP, this is bugging out for outputing P3 image
         while ((c = fgetc(fh)) != EOF){
             //If character I grab is a space, then I have a full rgb component, add to buffer
             if(isspace(c)){
@@ -135,7 +136,6 @@ int ppm_read(char *input_file){
                 }
                 if(tracker == 3){
                     image->buffer[j].b = k;
-
                     tracker = 0;
                 }
                 j++;
@@ -156,7 +156,6 @@ int ppm_read(char *input_file){
     }
     fclose(fh);
     return 0;
-
 }
 
 
@@ -169,13 +168,13 @@ typedef struct {
 // (-1, -1) (1, -1)
 
 Vertex vertexes[] = {
-  {{-1, 1}, {0, 0}},
-  {{1, 1},  {1, 0}},
-  {{-1, -1},  {0, 1}},
-  {{1, 1}, {1, 0}},
+  {{-1, 1}, {0, 0}}, //Bottom Left
+  {{1, 1},  {1, 0}},  //Bottom Right
+  {{-1, -1},  {0, 1}},  //Top Left
 
-  {{1, -1},  {1, 1}},
-  {{-1, -1},  {0, 1}}
+  {{1, 1}, {1, 0}}, //Bottom Right
+  {{1, -1},  {1, 1}}, //Top Right
+  {{-1, -1},  {0, 1}} //Top Left
 
 };
 
@@ -268,29 +267,6 @@ void glCompileShaderOrDie(GLuint shader) {
   }
 }
 
-// 4 x 4 image..
-unsigned char pimage[] = {
-  255, 0, 0, 255,
-  255, 0, 0, 255,
-  255, 0, 0, 255,
-  255, 0, 0, 255,
-
-  0, 255, 0, 255,
-  0, 255, 0, 255,
-  0, 255, 0, 255,
-  0, 255, 0, 255,
-
-  0, 0, 255, 255,
-  0, 0, 255, 255,
-  0, 0, 255, 255,
-  0, 0, 255, 255,
-
-  255, 0, 255, 255,
-  255, 0, 255, 255,
-  255, 0, 255, 255,
-  255, 0, 255, 255
-};
-
 int main(int argc, char *argv[]){
   if(argc != 2){
     fprintf(stderr, "Error: Not enough arguments need image file name. \n");
@@ -298,12 +274,21 @@ int main(int argc, char *argv[]){
   }
   char *input_file = argv[1];
   ppm_read(input_file);
+  //printf("image width: %d, image height: %d, input type: %d", image->width, image->height, image->input_filetype);
+  //Set Aspect Ratio of Triangles for rectangular images
+  x_ratio = (float)image->width/(float)image->height;
+  vertexes[0].Position[0]*= x_ratio;
+  vertexes[1].Position[0]*= x_ratio;
+  vertexes[2].Position[0]*= x_ratio;
+  vertexes[3].Position[0]*= x_ratio;
+  vertexes[4].Position[0]*= x_ratio;
+  vertexes[5].Position[0]*= x_ratio;
+  //Aspect Ration Done
+
 
   GLFWwindow* window;
   GLuint vertex_buffer, vertex_shader, fragment_shader, program, index_buffer;
   GLint mvp_location, vpos_location, vcol_location;
-  float x_ratio =0;
-
   glfwSetErrorCallback(error_callback);
 
   if (!glfwInit())
@@ -381,9 +366,6 @@ int main(int argc, char *argv[]){
                         sizeof(Vertex),
   	  (void*) (sizeof(float) * 2));
 
-  int pimage_width = 4;
-  int pimage_height = 4;
-
   GLuint texID;
   glGenTextures(1, &texID);
   glBindTexture(GL_TEXTURE_2D, texID);
@@ -398,6 +380,8 @@ int main(int argc, char *argv[]){
   glUniform1i(tex_location, 0);
 
 //HELP How to adjust ratio of triangle for rectangular images?
+
+
 
   while (!glfwWindowShouldClose(window))
   {
