@@ -1,6 +1,8 @@
 # CS430Proj5
 Project 5 - Image Viewer  
 
+This is working code for Windows.
+
 Image Viewer that should open up an input PPM image and display it in a GLFW window.  
 The GLFW window will allow the user to translate, rotate, scale, and shear the image.  
 
@@ -9,7 +11,7 @@ Run the program by calling: ezview input.ppm
 where input.ppm is the name of the ppm image being provided to the program.  
 
 ##Known Problems
-Everything works but reading in a P3 File is #SLOW, but it still works.  Will try to optimize it to be faster.  
+Everything works but reading in a P3 File is a bit slower than I would like.
 
 ##Controls
 A & D : Roates the image by 90 degree increments.  

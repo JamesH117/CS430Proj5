@@ -108,10 +108,9 @@ int ppm_read(char *input_file){
     //Remove unnecessary character still in file
     fgetc(fh);
     if(image->input_filetype == '3'){
-        printf("Reading in a P3 File, this is a bit slow.  Slight optimization problem.");
         i=0;
         //HELP, this is bugging out for outputing P3 image
-        for (i = 0; i < height*width*3; i++){
+        for (i = 0; i < height*width; i++){
             int v;
             fscanf(fh, "%d", &v);
             image->buffer[i].r = v;
